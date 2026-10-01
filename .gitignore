@@ -1,0 +1,37 @@
+# Java / Maven
+backend/target/
+*.class
+*.jar
+
+# Node / Vue
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Python
+__pycache__/
+*.pyc
+algorithm/.venv/
+algorithm/venv/
+
+# Node（全局兜底）
+node_modules/
+dist/
+.vite/
+
+# 日志
+*.log
+nohup.out
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 环境与本地配置
+application-local.yml
+.env

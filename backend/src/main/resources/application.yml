@@ -1,0 +1,30 @@
+server:
+  port: 8080
+  error:
+    # 让 ResponseStatusException 的 message 返回给前端展示
+    include-message: always
+
+spring:
+  application:
+    name: uav-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/uav_inspection?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+  jackson:
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+# 路径规划算法服务（Python FastAPI）地址
+# 用 127.0.0.1 避免 localhost 解析为 IPv6 ::1（uvicorn 默认只监听 IPv4）
+app:
+  algorithm-service:
+    base-url: http://127.0.0.1:8000
