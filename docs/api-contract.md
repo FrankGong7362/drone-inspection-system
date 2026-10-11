@@ -66,6 +66,32 @@
 前端（Vue3，开发端口 5173）经 Vite 代理访问后端 `http://localhost:8080`，路径前缀 `/api`。
 字段统一 **camelCase**（与 Java 实体一致）。
 
+## 登录认证（JWT）
+
+除 `/api/auth/login`、`/api/auth/register` 外，所有 `/api/**` 接口均需请求头
+`Authorization: Bearer <token>`；缺失/无效/过期返回 `401`（message 为中文原因）。
+前端将 token 存 localStorage，由共享 axios 实例（`src/api/http.js`）统一附带；收到 401 清登录态跳登录页。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/auth/register` | 注册（自动登录）：`{username, password, nickname?}`；用户名 3-32 位、密码 6-64 位，重复用户名 400 |
+| POST | `/api/auth/login` | 登录：`{username, password}`；密码错误 401 |
+
+响应体（登录/注册一致，密码 BCrypt 加密存储，响应不返回密码）：
+
+```json
+{
+  "token": "eyJhbGciOi...",
+  "userId": 1,
+  "username": "admin",
+  "nickname": "管理员",
+  "role": "admin"
+}
+```
+
+`role` 取值 `admin` / `user`（当前仅存储于 `sys_user` 表与 JWT claim，暂不做权限区分）。
+数据库表 `sys_user`；预置账号 `admin / 123456`。
+
 ## 任务与航点
 
 | 方法 | 路径 | 说明 |

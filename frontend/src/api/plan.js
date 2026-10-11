@@ -1,7 +1,6 @@
-import axios from 'axios'
+import http from './http'
 
-// 通过 Vite 代理转发到后端 :8080
-const http = axios.create({ baseURL: '/api' })
+// 统一实例已内置 JWT 请求头与 401 跳转（见 http.js）
 
 export function fetchTasks() {
   return http.get('/tasks')

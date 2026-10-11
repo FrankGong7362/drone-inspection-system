@@ -84,3 +84,21 @@ CREATE TABLE IF NOT EXISTS no_fly_zone (
     radius_km   DECIMAL(6,3) DEFAULT 0 COMMENT '半径(km)',
     PRIMARY KEY (id)
 ) COMMENT='禁飞区';
+
+-- 系统用户表（登录认证，JWT）
+CREATE TABLE IF NOT EXISTS sys_user (
+    id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    username    VARCHAR(32)  NOT NULL COMMENT '用户名',
+    password    VARCHAR(100) NOT NULL COMMENT '密码(BCrypt密文)',
+    nickname    VARCHAR(64)  DEFAULT NULL COMMENT '昵称',
+    role        VARCHAR(20)  DEFAULT 'user' COMMENT '角色 admin/user（暂不区分权限）',
+    create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_username (username)
+) COMMENT='系统用户';
+
+-- 预置管理员账号 admin / 123456（password 字段为 BCrypt 密文，请勿存明文）
+INSERT INTO sys_user (username, password, nickname, role)
+VALUES ('admin', '$2a$10$uM1kjqlTnwTLxrX0OY1JF.rsQGFQsDmiNfIH8WMwJnx54qUDV5x5q', '管理员', 'admin')
+ON DUPLICATE KEY UPDATE username = username;
