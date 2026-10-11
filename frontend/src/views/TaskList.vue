@@ -35,6 +35,13 @@
           <el-input-number v-model="form.waypointCount" :min="2" :max="30" />
           <span class="tip">自动生成模拟巡检点</span>
         </el-form-item>
+        <el-form-item label="起飞点经度">
+          <el-input-number v-model="form.centerLng" :min="-180" :max="180" :precision="6" :controls="false" style="width: 180px" />
+        </el-form-item>
+        <el-form-item label="起飞点纬度">
+          <el-input-number v-model="form.centerLat" :min="-90" :max="90" :precision="6" :controls="false" style="width: 180px" />
+          <span class="tip">模拟巡检点在该点 ±2km 内生成，不可位于禁飞区</span>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -58,7 +65,9 @@ const creating = ref(false)
 const form = ref({
   taskName: '',
   taskType: '园区',
-  waypointCount: 8
+  waypointCount: 8,
+  centerLng: 121.472225,
+  centerLat: 31.339709
 })
 
 async function load() {
@@ -67,7 +76,13 @@ async function load() {
 }
 
 function openCreate() {
-  form.value = { taskName: '', taskType: '园区', waypointCount: 8 }
+  form.value = {
+    taskName: '',
+    taskType: '园区',
+    waypointCount: 8,
+    centerLng: 121.472225,
+    centerLat: 31.339709
+  }
   dialogVisible.value = true
 }
 
@@ -76,13 +91,18 @@ async function submitCreate() {
     ElMessage.warning('请填写任务名称')
     return
   }
+  if (form.value.centerLng == null || form.value.centerLat == null) {
+    ElMessage.warning('请填写起飞点经纬度')
+    return
+  }
   creating.value = true
   try {
     const { data: task } = await createTask({
       taskName: form.value.taskName.trim(),
       taskType: form.value.taskType
     })
-    await generateWaypoints(task.id, form.value.waypointCount)
+    await generateWaypoints(task.id, form.value.waypointCount,
+      form.value.centerLng, form.value.centerLat)
     ElMessage.success('任务创建成功，已生成模拟航点')
     dialogVisible.value = false
     load()
