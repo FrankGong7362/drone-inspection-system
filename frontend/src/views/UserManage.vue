@@ -1,6 +1,7 @@
 <template>
   <div>
     <div style="margin-bottom: 12px">
+      <el-button plain @click="router.push('/tasks')">返回列表</el-button>
       <el-button type="primary" @click="load">刷新</el-button>
       <span class="tip">仅管理员可见。修改角色后对方需重新登录才生效。</span>
     </div>
@@ -45,8 +46,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchUsers, updateUserRole, deleteUser } from '../api/user'
+
+const router = useRouter()
 
 const users = ref([])
 const myId = JSON.parse(localStorage.getItem('user') || 'null')?.userId

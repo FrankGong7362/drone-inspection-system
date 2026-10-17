@@ -3,6 +3,7 @@
     <!-- 顶部任务信息条 -->
     <div class="task-bar">
       <div class="task-meta">
+        <el-button class="back-btn" plain @click="router.push('/tasks')">返回列表</el-button>
         <span class="task-no">{{ task?.taskNo || '--' }}</span>
         <span class="task-name">{{ task?.taskName || '加载中' }}</span>
         <el-tag size="small" :type="statusType">{{ statusText }}</el-tag>
@@ -292,13 +293,14 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { fetchTask, fetchWaypoints, generateWaypoints, addWaypoint, deleteWaypoint, renameWaypoint as renameWaypointApi, updateTask, requestPlan, fetchNoFlyZones } from '../api/plan'
 
 const route = useRoute()
+const router = useRouter()
 const taskId = Number(route.query.taskId)
 const myId = JSON.parse(localStorage.getItem('user') || 'null')?.userId
 const isAdmin = JSON.parse(localStorage.getItem('user') || 'null')?.role === 'admin'
@@ -900,6 +902,9 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+.back-btn {
+  flex-shrink: 0;
 }
 .task-no {
   font-weight: 700;
