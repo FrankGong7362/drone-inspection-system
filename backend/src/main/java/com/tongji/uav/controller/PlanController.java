@@ -3,6 +3,8 @@ package com.tongji.uav.controller;
 import com.tongji.uav.dto.PlanCommand;
 import com.tongji.uav.dto.PlanResultVO;
 import com.tongji.uav.service.PlanService;
+import com.tongji.uav.service.TaskAccessGuard;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,19 +17,25 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 路径规划接口：接收前端请求 → 调 Python 算法服务 → 结果落库并返回。
+ * 规划权限：任务公开或为 owner/admin（TaskAccessGuard.requireVisible 判定）。
  */
 @RestController
 @RequestMapping("/api/plan")
 public class PlanController {
 
     private final PlanService planService;
+    private final TaskAccessGuard accessGuard;
 
-    public PlanController(PlanService planService) {
+    public PlanController(PlanService planService, TaskAccessGuard accessGuard) {
         this.planService = planService;
+        this.accessGuard = accessGuard;
     }
 
     @PostMapping
-    public PlanResultVO plan(@RequestBody PlanCommand command) {
+    public PlanResultVO plan(@RequestBody PlanCommand command, HttpServletRequest request) {
+        accessGuard.requireVisible(command.getTaskId(),
+                (Long) request.getAttribute("userId"),
+                (String) request.getAttribute("role"));
         try {
             return planService.plan(command);
         } catch (HttpClientErrorException e) {

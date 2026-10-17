@@ -6,6 +6,9 @@
         <span class="task-no">{{ task?.taskNo || '--' }}</span>
         <span class="task-name">{{ task?.taskName || '加载中' }}</span>
         <el-tag size="small" :type="statusType">{{ statusText }}</el-tag>
+        <el-tag size="small" :type="task?.visible ? 'success' : 'info'" effect="plain">
+          {{ task?.visible ? '公开' : '私有' }}
+        </el-tag>
         <el-tag size="small" type="info" effect="plain">{{ waypoints.length }} 个航点</el-tag>
       </div>
       <div v-if="info" class="result-brief">
@@ -78,11 +81,11 @@
           </div>
           <div class="btn-col">
             <el-button style="width: 100%" :loading="locating" @click="locateMe">定位到我</el-button>
-            <el-button v-if="isAdmin" style="width: 100%" :type="addMode ? 'warning' : 'success'" @click="toggleAddMode">
+            <el-button v-if="canEdit" style="width: 100%" :type="addMode ? 'warning' : 'success'" @click="toggleAddMode">
               {{ addMode ? '取消选点' : '新增巡检点' }}
             </el-button>
-            <el-button v-if="isAdmin" style="width: 100%" @click="openCoordDialog">按经纬度添加</el-button>
-            <el-button v-if="isAdmin" style="width: 100%" :loading="generating" @click="openGenDialog">生成模拟航点</el-button>
+            <el-button v-if="canEdit" style="width: 100%" @click="openCoordDialog">按经纬度添加</el-button>
+            <el-button v-if="canEdit" style="width: 100%" :loading="generating" @click="openGenDialog">生成模拟航点</el-button>
           </div>
           <div class="tip" style="margin-top: 8px">地图航点上右键：设为起飞点 / 删除该点</div>
           <el-alert
@@ -118,9 +121,9 @@
             <el-table-column label="操作" width="176">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click.stop="locateWaypoint(row)">定位</el-button>
-                <el-button v-if="isAdmin" link type="success" size="small" @click.stop="renameWaypoint(row)">改名</el-button>
-                <el-button v-if="isAdmin" link type="warning" size="small" @click.stop="setStartPoint(row)">起飞</el-button>
-                <el-button v-if="isAdmin" link type="danger" size="small" @click.stop="removeWaypoint(row)">删除</el-button>
+                <el-button v-if="canEdit" link type="success" size="small" @click.stop="renameWaypoint(row)">改名</el-button>
+                <el-button v-if="canEdit" link type="warning" size="small" @click.stop="setStartPoint(row)">起飞</el-button>
+                <el-button v-if="canEdit" link type="danger" size="small" @click.stop="removeWaypoint(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -133,7 +136,7 @@
             <div class="coord-main">{{ picked.lng.toFixed(6) }}, {{ picked.lat.toFixed(6) }}</div>
             <div class="tip">来自选点 / 定位 / 搜索，可一键添加为巡检点</div>
             <el-button
-              v-if="isAdmin"
+              v-if="canEdit"
               style="width: 100%; margin-top: 8px"
               type="success"
               plain
@@ -198,7 +201,7 @@
     <!-- 航点右键操作菜单 -->
     <teleport to="body">
       <div
-        v-if="ctxMenu.visible && isAdmin"
+        v-if="ctxMenu.visible && canEdit"
         class="ctx-menu"
         :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
         @click.stop
@@ -219,7 +222,7 @@
         </el-table-column>
         <el-table-column label="操作" width="120">
           <template #default="{ row }">
-            <el-button v-if="isAdmin" size="small" type="success" plain @click.stop="addFromSearch(row)">添加为巡检点</el-button>
+            <el-button v-if="canEdit" size="small" type="success" plain @click.stop="addFromSearch(row)">添加为巡检点</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -276,7 +279,7 @@
           title="请先在地图上定位或点选一个位置作为起飞点"
           style="margin-top: 10px"
         >
-          <el-button v-if="isAdmin" size="small" type="warning" plain @click="goPickStartPoint">去选起飞点</el-button>
+          <el-button v-if="canEdit" size="small" type="warning" plain @click="goPickStartPoint">去选起飞点</el-button>
         </el-alert>
       </div>
       <template #footer>
@@ -297,8 +300,10 @@ import { fetchTask, fetchWaypoints, generateWaypoints, addWaypoint, deleteWaypoi
 
 const route = useRoute()
 const taskId = Number(route.query.taskId)
-// 航点写操作（新增/改名/删除/设起飞点/生成模拟航点）仅 admin 可见，与后端 403 拦截对应
+const myId = JSON.parse(localStorage.getItem('user') || 'null')?.userId
 const isAdmin = JSON.parse(localStorage.getItem('user') || 'null')?.role === 'admin'
+// 航点写操作仅 owner/admin（公开任务他人只读 + 可规划），后端 TaskAccessGuard 兜底
+const canEdit = computed(() => isAdmin || task.value?.createdBy === myId)
 const algorithm = ref('ga')
 const maxRange = ref(20)
 const loading = ref(false)

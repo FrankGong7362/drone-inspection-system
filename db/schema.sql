@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS inspection_task (
     task_name        VARCHAR(128) NOT NULL COMMENT '任务名称',
     task_type        VARCHAR(20)  DEFAULT '园区' COMMENT '电力/园区/交通',
     status           VARCHAR(20)  DEFAULT '待执行' COMMENT '待执行/执行中/已完成/已取消',
+    created_by       BIGINT       DEFAULT NULL COMMENT '创建者用户id(sys_user.id)',
+    visible          TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '对其他用户可见 1公开 0私有',
     start_point_id   BIGINT       DEFAULT NULL COMMENT '起始航点id',
     total_distance   DECIMAL(10,2) DEFAULT NULL COMMENT '规划总航程(km)',
     estimated_duration INT        DEFAULT NULL COMMENT '预计时长(分钟)',

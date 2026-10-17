@@ -28,6 +28,12 @@ public class Task {
     /** 待执行 / 执行中 / 已完成 / 已取消 */
     private String status;
 
+    /** 创建者用户 id（sys_user.id），决定归属与可编辑性 */
+    private Long createdBy;
+
+    /** 对其他用户可见：true 公开（他人可查看并规划），false 私有（仅自己） */
+    private Boolean visible;
+
     private Long startPointId;
 
     private BigDecimal totalDistance;

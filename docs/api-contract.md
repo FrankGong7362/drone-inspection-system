@@ -91,18 +91,29 @@
 
 `role` 取值 `admin` / `user`。数据库表 `sys_user`；预置账号 `admin / 123456`；注册固定为 `user`。
 
-### 角色权限（2026-10-17 起）
+### 角色权限（2026-10-17 起，含任务归属）
 
-后端在 JWT 认证后按角色统一拦截（`AuthInterceptor`）：
+后端在 JWT 认证后统一拦截（`AuthInterceptor` + `TaskAccessGuard`）：
 
-| 操作 | admin | user |
-|---|---|---|
-| GET 查询类接口（任务/航点/禁飞区/规划结果） | ✅ | ✅ |
-| POST `/api/plan` 发起规划 | ✅ | ✅ |
-| 任务/航点写操作（POST/PUT/DELETE） | ✅ | ❌ 403 |
-| `/api/users` 用户管理全部接口 | ✅ | ❌ 403 |
+| 操作 | admin | 任务 owner | 其他用户 |
+|---|---|---|---|
+| GET 任务列表 | 全部任务 | 自己的 + 公开的 | 自己的 + 公开的 |
+| GET 任务详情 / 航点（私有任务） | ✅ | ✅ | ❌ 403 |
+| GET 任务详情 / 航点（公开任务） | ✅ | ✅ | ✅ |
+| POST `/api/tasks` 创建任务 | ✅ | ✅ | ✅（创建者即 owner） |
+| PUT/DELETE 任务、航点增删改/生成 | ✅ 任意任务 | ✅ 自己的 | ❌ 403 |
+| POST `/api/plan` 发起规划 | ✅ 任意任务 | ✅ 自己的（含私有） | ✅ 仅公开任务，私有 403 |
+| `/api/users` 用户管理 | ✅ | ❌ 403 | ❌ 403 |
 
-权限以 token 内 role claim 为准；**管理员修改某用户角色后，该用户需重新登录才获得新角色**。
+权限以 token 内 role claim 与任务 `createdBy` 为准；**管理员修改某用户角色后，该用户需重新登录才获得新角色**。
+
+### 任务归属与可见性
+
+`inspection_task` 新增字段：`createdBy`（创建者 sys_user.id，决定可编辑性）、`visible`（true 公开 / false 私有，默认公开）。
+
+- 创建时通过 POST /api/tasks 请求体 `visible` 指定；创建后 owner 用 `PUT /api/tasks/{id}` body `{"visible": false}` 随时切换。
+- 公开任务：所有人可查看航点并发起规划（规划会更新任务的总航程/结果）。
+- 私有任务：不出现在他人任务列表中，他人直连访问返回 403。
 
 ## 用户管理（仅 admin）
 
@@ -133,7 +144,7 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/tasks` | 任务列表 |
-| POST | `/api/tasks` | 创建任务 `{taskName, taskType}`，编号/状态后端自动生成 |
+| POST | `/api/tasks` | 创建任务 `{taskName, taskType, visible?}`（visible 缺省 true 公开；true 公开/false 私有），编号/状态/创建者后端自动生成 |
 | GET | `/api/tasks/{id}` | 任务详情 |
 | PUT | `/api/tasks/{id}` | 更新任务 |
 | DELETE | `/api/tasks/{id}` | 删除任务 |
