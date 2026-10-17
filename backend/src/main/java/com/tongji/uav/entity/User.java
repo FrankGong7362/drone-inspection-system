@@ -24,7 +24,7 @@ public class User {
 
     private String nickname;
 
-    /** admin / user（本次仅存储，不做权限区分） */
+    /** admin / user（写操作与用户管理仅 admin，见 AuthInterceptor） */
     private String role;
 
     private LocalDateTime createTime;

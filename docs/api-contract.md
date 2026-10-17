@@ -89,8 +89,44 @@
 }
 ```
 
-`role` 取值 `admin` / `user`（当前仅存储于 `sys_user` 表与 JWT claim，暂不做权限区分）。
-数据库表 `sys_user`；预置账号 `admin / 123456`。
+`role` 取值 `admin` / `user`。数据库表 `sys_user`；预置账号 `admin / 123456`；注册固定为 `user`。
+
+### 角色权限（2026-10-17 起）
+
+后端在 JWT 认证后按角色统一拦截（`AuthInterceptor`）：
+
+| 操作 | admin | user |
+|---|---|---|
+| GET 查询类接口（任务/航点/禁飞区/规划结果） | ✅ | ✅ |
+| POST `/api/plan` 发起规划 | ✅ | ✅ |
+| 任务/航点写操作（POST/PUT/DELETE） | ✅ | ❌ 403 |
+| `/api/users` 用户管理全部接口 | ✅ | ❌ 403 |
+
+权限以 token 内 role claim 为准；**管理员修改某用户角色后，该用户需重新登录才获得新角色**。
+
+## 用户管理（仅 admin）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/users` | 用户列表（按 id 升序），响应不含密码 |
+| PUT | `/api/users/{id}/role` | 修改角色，body: `{role: "admin" \| "user"}` |
+| DELETE | `/api/users/{id}` | 删除用户 |
+
+约束：不能修改自己的角色、不能删除自己的账号（400）；系统至少保留一名管理员（对最后一个 admin 降级/删除返回 400）；目标用户不存在 400；非 admin 访问 403。
+
+用户列表响应体：
+
+```json
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "nickname": "管理员",
+    "role": "admin",
+    "createTime": "2026-10-11T21:00:00"
+  }
+]
+```
 
 ## 任务与航点
 

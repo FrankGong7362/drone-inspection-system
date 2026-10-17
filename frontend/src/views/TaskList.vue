@@ -2,7 +2,7 @@
   <div>
     <div style="margin-bottom: 12px">
       <el-button type="primary" @click="load">刷新</el-button>
-      <el-button type="success" @click="openCreate">新建任务</el-button>
+      <el-button v-if="isAdmin" type="success" @click="openCreate">新建任务</el-button>
     </div>
     <el-table :data="tasks" border stripe>
       <el-table-column prop="taskNo" label="任务编号" width="160" />
@@ -13,7 +13,7 @@
       <el-table-column label="操作" width="200">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="goPlan(row)">规划</el-button>
-          <el-button size="small" type="danger" @click="remove(row)">删除</el-button>
+          <el-button v-if="isAdmin" size="small" type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -59,6 +59,8 @@ import { fetchTasks, deleteTask, createTask, generateWaypoints } from '../api/pl
 
 const router = useRouter()
 const tasks = ref([])
+// 写操作（新建/删除任务）仅 admin 可见，与后端 403 拦截对应
+const isAdmin = JSON.parse(localStorage.getItem('user') || 'null')?.role === 'admin'
 
 const dialogVisible = ref(false)
 const creating = ref(false)
