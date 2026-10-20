@@ -44,13 +44,14 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
         // 角色权限：/api/users 全部接口仅 admin；非 GET 写操作仅 admin，
-        // 但 /api/tasks 的创建与具体任务读写由 TaskAccessGuard 按 owner/可见性判定（所有人可建任务）
+        // 但 /api/tasks（所有人可建任务）、/api/plan（规划任何人发起）、/api/auth/me（个人中心自助修改）对所有登录用户放行
         String role = (String) request.getAttribute("role");
         String path = request.getRequestURI();
         boolean adminOnly = path.startsWith("/api/users")
                 || (!HttpMethod.GET.matches(request.getMethod())
                     && !path.startsWith("/api/plan")
-                    && !path.startsWith("/api/tasks"));
+                    && !path.startsWith("/api/tasks")
+                    && !path.startsWith("/api/auth/me"));
         if (adminOnly && !"admin".equals(role)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "需要管理员权限");
             return false;

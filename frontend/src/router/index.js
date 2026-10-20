@@ -3,13 +3,15 @@ import TaskList from '../views/TaskList.vue'
 import PlanView from '../views/PlanView.vue'
 import LoginView from '../views/LoginView.vue'
 import UserManage from '../views/UserManage.vue'
+import ProfileView from '../views/ProfileView.vue'
 
 const routes = [
   { path: '/', redirect: '/tasks' },
   { path: '/login', name: 'Login', component: LoginView },
   { path: '/tasks', name: 'TaskList', component: TaskList },
   { path: '/map', name: 'PlanView', component: PlanView },
-  { path: '/users', name: 'UserManage', component: UserManage }
+  { path: '/users', name: 'UserManage', component: UserManage },
+  { path: '/profile', name: 'Profile', component: ProfileView }
 ]
 
 const router = createRouter({

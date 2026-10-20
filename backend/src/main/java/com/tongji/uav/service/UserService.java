@@ -71,7 +71,7 @@ public class UserService {
 
     private UserVO toVO(User user) {
         UserVO vo = new UserVO();
-        vo.setId(user.getId());
+        vo.setUserId(user.getId());
         vo.setUsername(user.getUsername());
         vo.setNickname(user.getNickname());
         vo.setRole(user.getRole());

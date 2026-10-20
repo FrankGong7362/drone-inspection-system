@@ -5,13 +5,12 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 用户信息视图对象：用户管理接口返回，隔离 User 实体的密码字段。
- * 面向前端，字段 camelCase（与 LoginResponse 一致）。
+ * 当前用户资料响应：不含 password。字段 camelCase 与前端契约一致。
  */
 @Data
 public class UserVO {
 
-    private Long id;
+    private Long userId;
 
     private String username;
 

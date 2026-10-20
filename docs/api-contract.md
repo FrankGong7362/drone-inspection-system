@@ -91,6 +91,16 @@
 
 `role` 取值 `admin` / `user`。数据库表 `sys_user`；预置账号 `admin / 123456`；注册固定为 `user`。
 
+### 个人中心（自助）
+
+所有登录用户可用（`AuthInterceptor` 放行 `/api/auth/me` 路径）。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/auth/me` | 获取当前用户资料（返回 `userId`/`username`/`nickname`/`role`/`createTime`，**不含 password**） |
+| PUT | `/api/auth/me` | 自助修改昵称：请求体 `{nickname}`（必填，最长 30 字符），返回更新后的 UserVO |
+| POST | `/api/auth/me/password` | 自助修改密码：请求体 `{oldPassword, newPassword}`；新密码 8-30 位且同时含字母与数字；新旧密码不能相同；旧密码错误返回 400；**成功后前端应强制退出重新登录** |
+
 ### 角色权限（2026-10-17 起，含任务归属）
 
 后端在 JWT 认证后统一拦截（`AuthInterceptor` + `TaskAccessGuard`）：
