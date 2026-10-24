@@ -4,6 +4,7 @@ import PlanView from '../views/PlanView.vue'
 import LoginView from '../views/LoginView.vue'
 import UserManage from '../views/UserManage.vue'
 import ProfileView from '../views/ProfileView.vue'
+import NoFlyZoneManage from '../views/NoFlyZoneManage.vue'
 
 const routes = [
   { path: '/', redirect: '/tasks' },
@@ -11,7 +12,8 @@ const routes = [
   { path: '/tasks', name: 'TaskList', component: TaskList },
   { path: '/map', name: 'PlanView', component: PlanView },
   { path: '/users', name: 'UserManage', component: UserManage },
-  { path: '/profile', name: 'Profile', component: ProfileView }
+  { path: '/profile', name: 'Profile', component: ProfileView },
+  { path: '/no-fly-zones', name: 'NoFlyZoneManage', component: NoFlyZoneManage }
 ]
 
 const router = createRouter({
@@ -19,12 +21,12 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫：未登录一律跳登录页；已登录访问登录页跳任务列表；/users 仅 admin 可进
+// 路由守卫：未登录一律跳登录页；已登录访问登录页跳任务列表；/users、/no-fly-zones 仅 admin 可进
 router.beforeEach((to) => {
   const token = localStorage.getItem('token')
   if (to.path !== '/login' && !token) return '/login'
   if (to.path === '/login' && token) return '/tasks'
-  if (to.path === '/users') {
+  if (to.path === '/users' || to.path === '/no-fly-zones') {
     const role = JSON.parse(localStorage.getItem('user') || 'null')?.role
     if (role !== 'admin') return '/tasks'
   }

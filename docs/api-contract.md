@@ -215,4 +215,9 @@
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/no-fly-zones` | **禁飞区只读列表**（按 id 升序）。返回 `[{id, name, centerLng, centerLat, radiusKm}]`（半径 km）；前端地图以红色半透明圆形展示，点击弹名称与半径。本次无增删改接口，算法避障待 A* 实现时接入 |
+| GET | `/api/no-fly-zones` | 禁飞区列表（按 id 升序，所有登录用户可读）。返回 `[{id, name, centerLng, centerLat, radiusKm}]`（半径 km）；前端地图以红色半透明圆形展示 |
+| POST | `/api/no-fly-zones` | **仅 admin**。新增：`{name?, centerLng, centerLat, radiusKm}`；经度 -180~180、纬度 -90~90、半径 (0, 50] km，name 缺省为「禁飞区」 |
+| PUT | `/api/no-fly-zones/{id}` | **仅 admin**。修改同上请求体；id 不存在返回 404 |
+| DELETE | `/api/no-fly-zones/{id}` | **仅 admin**。删除；id 不存在返回 404 |
+
+管理页面 `/no-fly-zones`（仅 admin 可见）：列表 + 地图可视化，支持地图点选圆心、点圆直接编辑、虚线预览半径效果。禁飞区变更后，新发起的规划即时生效（规划时按当前禁飞区实时传给算法服务）。
