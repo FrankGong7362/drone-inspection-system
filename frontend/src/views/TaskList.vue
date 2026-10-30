@@ -9,7 +9,11 @@
       <el-table-column prop="taskNo" label="任务编号" width="160" />
       <el-table-column prop="taskName" label="任务名称" />
       <el-table-column prop="taskType" label="类型" width="100" />
-      <el-table-column prop="status" label="状态" width="120" />
+      <el-table-column prop="status" label="状态" width="110">
+        <template #default="{ row }">
+          <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="totalDistance" label="总航程(km)" width="120" />
       <el-table-column label="可见性" width="130">
         <template #default="{ row }">
@@ -23,9 +27,16 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200">
+      <el-table-column label="操作" width="290">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="goPlan(row)">规划</el-button>
+          <el-button
+            v-if="isAdmin || row.createdBy === myId"
+            size="small"
+            :type="row.status === '已完成' || row.status === '已取消' ? 'info' : 'success'"
+            :title="row.status === '已完成' || row.status === '已取消' ? '查看历史执行日志' : '下发执行 / 查看日志'"
+            @click="goExecute(row)"
+          >{{ executeLabel(row) }}</el-button>
           <el-button v-if="isAdmin || row.createdBy === myId" size="small" type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -161,6 +172,20 @@ async function toggleVisible(row, visible) {
 
 function goPlan(row) {
   router.push({ path: '/map', query: { taskId: row.id } })
+}
+
+function goExecute(row) {
+  router.push({ path: '/execute', query: { taskId: row.id } })
+}
+
+function executeLabel(row) {
+  if (row.status === '执行中') return '执行中'
+  if (row.status === '已完成' || row.status === '已取消') return '日志'
+  return '执行'
+}
+
+function statusType(s) {
+  return { 待执行: 'info', 执行中: 'warning', 已完成: 'success', 已取消: 'danger' }[s] || 'info'
 }
 
 onMounted(load)

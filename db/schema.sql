@@ -50,6 +50,17 @@ CREATE TABLE IF NOT EXISTS drone (
     UNIQUE KEY uk_drone_no (drone_no)
 ) COMMENT='无人机档案';
 
+-- 预置演示无人机（幂等；执行模拟下发任务时可选）
+INSERT INTO drone (drone_no, model, battery_capacity, max_flight_range, max_speed, status)
+VALUES ('DJI-M300-01', 'DJI Matrice 300 RTK', 5000, 15.00, 15.00, '可用')
+ON DUPLICATE KEY UPDATE drone_no = drone_no;
+INSERT INTO drone (drone_no, model, battery_capacity, max_flight_range, max_speed, status)
+VALUES ('PHANTOM-4-02', 'DJI Phantom 4 RTK', 5870, 12.00, 12.00, '可用')
+ON DUPLICATE KEY UPDATE drone_no = drone_no;
+INSERT INTO drone (drone_no, model, battery_capacity, max_flight_range, max_speed, status)
+VALUES ('MAVIC-3E-03', 'DJI Mavic 3 Enterprise', 5000, 9.00, 12.00, '维护')
+ON DUPLICATE KEY UPDATE drone_no = drone_no;
+
 -- 执行日志表
 CREATE TABLE IF NOT EXISTS mission_log (
     id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -69,6 +80,7 @@ CREATE TABLE IF NOT EXISTS planning_result (
     task_id          BIGINT       NOT NULL COMMENT '任务',
     algorithm        VARCHAR(20)  NOT NULL COMMENT 'ga/aco/astar/greedy/nearest',
     route            JSON         DEFAULT NULL COMMENT '访问顺序(waypoint.id数组)',
+    detail_paths     JSON         DEFAULT NULL COMMENT '避障折线[[lat,lng]]，执行模拟沿真实航线飞行',
     total_distance   DECIMAL(10,2) DEFAULT NULL COMMENT '总航程(km)',
     run_time_ms      BIGINT       DEFAULT NULL COMMENT '耗时(ms)',
     feasible         TINYINT      DEFAULT 1 COMMENT '是否满足约束',

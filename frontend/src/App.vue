@@ -4,6 +4,7 @@
       <span>无人机巡检任务管理与路径规划系统</span>
       <div v-if="username" class="user-area">
         <el-button v-if="role === 'admin'" size="small" text class="nav-link" @click="router.push('/users')">用户管理</el-button>
+        <el-button v-if="role === 'admin'" size="small" text class="nav-link" @click="router.push('/drones')">无人机管理</el-button>
         <el-button v-if="role === 'admin'" size="small" text class="nav-link" @click="router.push('/no-fly-zones')">禁飞区管理</el-button>
         <el-button size="small" text class="nav-link" @click="router.push('/profile')">个人中心</el-button>
         <span class="nick">{{ nickname }}</span>
@@ -69,6 +70,22 @@ function logout() {
   color: #fff;
 }
 .nav-link {
+  color: #fff;
+}
+/* 头部文字按钮统一为白色（Element Plus 默认 is-text 为灰色，需更高优先级覆盖） */
+.header .user-area .el-button.is-text {
+  --el-button-text-color: #fff;
+  --el-button-hover-text-color: #fff;
+  --el-button-active-text-color: #fff;
+  --el-button-hover-bg-color: rgba(255, 255, 255, 0.15);
+  --el-button-active-bg-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.header .user-area .el-button.is-text:hover,
+.header .user-area .el-button.is-text:focus {
+  color: #fff;
+}
+.header .user-area .el-button.is-text span {
   color: #fff;
 }
 </style>

@@ -72,6 +72,7 @@ public class PlanService {
         result.setTaskId(command.getTaskId());
         result.setAlgorithm(resp.getAlgorithm());
         result.setRoute(resp.getRoute());
+        result.setDetailPaths(resp.getDetailPaths());
         result.setTotalDistance(resp.getTotalDistanceKm() == null
                 ? null : BigDecimal.valueOf(resp.getTotalDistanceKm()).setScale(2, RoundingMode.HALF_UP));
         result.setRunTimeMs(resp.getRunTimeMs());

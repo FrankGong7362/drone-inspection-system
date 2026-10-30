@@ -113,6 +113,10 @@
 | POST `/api/tasks` 创建任务 | ✅ | ✅ | ✅（创建者即 owner） |
 | PUT/DELETE 任务、航点增删改/生成 | ✅ 任意任务 | ✅ 自己的 | ❌ 403 |
 | POST `/api/plan` 发起规划 | ✅ 任意任务 | ✅ 自己的（含私有） | ✅ 仅公开任务，私有 403 |
+| GET `/api/drones` 无人机列表 | ✅ | ✅ | ✅ |
+| POST/PUT/DELETE `/api/drones` | ✅ | ❌ 403 | ❌ 403 |
+| 任务执行 `/dispatch`、`/finish`、`/cancel`、POST `/logs` | ✅ 任意任务 | ✅ 自己的 | ❌ 403 |
+| GET `/latest-plan`、`/logs` | ✅ 任意任务 | ✅ 自己的 | ✅ 仅公开任务 |
 | `/api/users` 用户管理 | ✅ | ❌ 403 | ❌ 403 |
 
 权限以 token 内 role claim 与任务 `createdBy` 为准；**管理员修改某用户角色后，该用户需重新登录才获得新角色**。
@@ -211,6 +215,9 @@
 `resultId`（planning_result 落库主键）、`convergence`（GA/ACO 收敛曲线，可选）。
 结果同时写入 `planning_result` 表并回填 `inspection_task.total_distance`。
 
+`planning_result` 新增 `detail_paths JSON` 列（2026-10-30）：算法服务返回的避障折线顶点
+`[[lat, lng], ...]`（Leaflet 经纬度顺序），用于执行页沿真实折线回放飞行；无该字段时前端回退为航点直连。
+
 ## 禁飞区
 
 | 方法 | 路径 | 说明 |
@@ -221,3 +228,97 @@
 | DELETE | `/api/no-fly-zones/{id}` | **仅 admin**。删除；id 不存在返回 404 |
 
 管理页面 `/no-fly-zones`（仅 admin 可见）：列表 + 地图可视化，支持地图点选圆心、点圆直接编辑、虚线预览半径效果。禁飞区变更后，新发起的规划即时生效（规划时按当前禁飞区实时传给算法服务）。
+
+## 无人机档案（2026-10-30）
+
+数据库表 `drone`，实体 `com.tongji.uav.entity.Drone`，状态取值 **可用 / 作业 / 维护 / 离线**。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/drones` | 所有登录用户 | 列表（按 id 升序） |
+| POST | `/api/drones` | 仅 admin | 新增；机号唯一，缺省状态「可用」 |
+| PUT | `/api/drones/{id}` | 仅 admin | 修改；id 不存在 404；绑定任务中不允许改为非「作业」状态（400） |
+| DELETE | `/api/drones/{id}` | 仅 admin | 删除；绑定任务中不允许删除（400）；id 不存在 404 |
+
+请求体（`DroneRequest`，camelCase）：
+
+```json
+{
+  "droneNo": "DJI-M300-01",
+  "model": "DJI Matrice 300 RTK",
+  "batteryCapacity": 5000,
+  "maxFlightRange": 60,
+  "maxSpeed": 55,
+  "status": "可用"
+}
+```
+
+校验：`droneNo` 必填 ≤32 且唯一；`model` ≤64；`batteryCapacity` 0~100000（mAh）；
+`maxFlightRange` 0~1000（km）；`maxSpeed` 0~200（km/h）；`status` 必须为上述四值之一。
+
+响应体：
+
+```json
+{
+  "id": 1,
+  "droneNo": "DJI-M300-01",
+  "model": "DJI Matrice 300 RTK",
+  "batteryCapacity": 5000.00,
+  "maxFlightRange": 60.00,
+  "maxSpeed": 55.00,
+  "status": "可用",
+  "bindTaskId": null
+}
+```
+
+`bindTaskId` 为当前绑定的任务 id（执行中才有值），由任务下发/完成/取消自动维护。
+前端管理页 `/drones`（仅 admin 可见）提供表格 + 新增/编辑弹窗 + 状态标签。
+
+## 任务执行模拟（2026-10-30）
+
+任务状态机：**待执行 → 执行中 → 已完成 / 已取消**；无人机状态随执行联动（可用 ↔ 作业）。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/tasks/{id}/latest-plan` | 最近一次规划结果（含 `detailPaths` 折线）；无规划返回 **200 空体** |
+| GET | `/api/tasks/{id}/logs` | 执行日志（按 id 正序），所有可见者均可读 |
+| POST | `/api/tasks/{id}/dispatch` | 下发执行，body `{droneId}`；需已有规划且无人机「可用」，否则 400/404 |
+| POST | `/api/tasks/{id}/logs` | 追加过程日志 `{action, waypointId?, detail?}`；仅执行中任务 |
+| POST | `/api/tasks/{id}/finish` | 完成执行（仅执行中）：任务→已完成，写「降落」日志并释放无人机 |
+| POST | `/api/tasks/{id}/cancel` | 取消（仅待执行/执行中）：任务→已取消，写「返航」（执行中）/「异常」（待执行）日志并释放无人机 |
+
+`latest-plan` 响应：
+
+```json
+{
+  "resultId": 46,
+  "algorithm": "ga",
+  "route": [0, 3, 1, 2, 4, 0],
+  "totalDistanceKm": 58.53,
+  "feasible": true,
+  "detailPaths": [[31.3397, 121.4702], [31.3412, 121.4751]]
+}
+```
+
+`logs` 响应元素：
+
+```json
+{
+  "id": 1,
+  "taskId": 2,
+  "droneId": 3,
+  "action": "起飞",
+  "waypointId": null,
+  "logTime": "2026-10-30T17:20:00",
+  "detail": "任务下发，无人机 DJI-M300-01 起飞"
+}
+```
+
+动作取值：`起飞` / `到点` / `返航` / `降落` / `异常`（「异常」也用于取消尚未起飞的任务）。
+其中 `到点`、`异常` 可由前端追加，其余由后端在执行状态流转时自动写入。
+
+错误约定：重复下发 / 无规划下发 / 无人机不可用 / 对非执行中任务追加日志或完成 / 取消已结束任务 → `400`（message 中文）；无人机不存在 → `404`；非 owner 且非 admin → `403`。
+
+前端执行页 `/execute?taskId=`：按 `detailPaths` 折线做 `requestAnimationFrame` 回放，无人机图标沿线飞行，
+到点异步写入「到点」日志，进度条按累计距离推进；动画结束自动完成执行并刷新无人机状态。
+

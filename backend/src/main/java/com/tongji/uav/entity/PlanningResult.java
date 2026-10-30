@@ -30,6 +30,10 @@ public class PlanningResult {
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<Long> route;
 
+    /** 避障折线 [[lat, lng], ...]，供执行模拟沿真实航线飞行，MySQL JSON 列 */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<List<Double>> detailPaths;
+
     private BigDecimal totalDistance;
 
     private Long runTimeMs;
