@@ -6,6 +6,7 @@
         <el-button v-if="role === 'admin'" size="small" text class="nav-link" @click="router.push('/users')">用户管理</el-button>
         <el-button v-if="role === 'admin'" size="small" text class="nav-link" @click="router.push('/drones')">无人机管理</el-button>
         <el-button v-if="role === 'admin'" size="small" text class="nav-link" @click="router.push('/no-fly-zones')">禁飞区管理</el-button>
+        <el-button v-if="role === 'admin'" size="small" text class="nav-link" @click="router.push('/audit-logs')">审计日志</el-button>
         <el-button size="small" text class="nav-link" @click="router.push('/profile')">个人中心</el-button>
         <span class="nick">{{ nickname }}</span>
         <el-tag :type="role === 'admin' ? 'danger' : 'info'" size="small">{{ role === 'admin' ? '管理员' : '普通用户' }}</el-tag>

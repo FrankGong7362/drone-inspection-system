@@ -57,3 +57,21 @@ export function renameWaypoint(taskId, waypointId, name) {
 export function fetchNoFlyZones() {
   return http.get('/no-fly-zones')
 }
+
+// 规划历史：历次 planning_result（最新在前）
+export function fetchPlanHistory(taskId) {
+  return http.get(`/tasks/${taskId}/plans`)
+}
+
+// 单次规划详情（含 route / detailPaths），用于历史回看重绘
+export function fetchPlanDetail(taskId, resultId) {
+  return http.get(`/tasks/${taskId}/plans/${resultId}`)
+}
+
+// 导出航线：format = kml | csv（返回二进制，前端触发下载）
+export function exportPlan(taskId, resultId, format) {
+  return http.get(`/tasks/${taskId}/plans/${resultId}/export`, {
+    params: { format },
+    responseType: 'blob'
+  })
+}

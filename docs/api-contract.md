@@ -322,3 +322,89 @@
 前端执行页 `/execute?taskId=`：按 `detailPaths` 折线做 `requestAnimationFrame` 回放，无人机图标沿线飞行，
 到点异步写入「到点」日志，进度条按累计距离推进；动画结束自动完成执行并刷新无人机状态。
 
+## 规划历史与航线导出（2026-10-31）
+
+`planning_result` 为追加式历史（每次规划新增一行），`latest-plan` 仍取最新一条；以下接口用于回看历次结果与导出航线。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/tasks/{id}/plans` | owner / admin / 公开任务 | 历次规划列表，按 id 倒序；不含 `route`/`detailPaths` 大字段 |
+| GET | `/api/tasks/{id}/plans/{resultId}` | 同上 | 单次规划详情（含 `route` 与 `detailPaths`），用于前端重绘 |
+| GET | `/api/tasks/{id}/plans/{resultId}/export?format=kml\|csv` | 同上 | 导出航线文件；`format` 缺省 `kml`，其余值 400 |
+
+列表元素：
+
+```json
+{
+  "resultId": 214,
+  "taskId": 2,
+  "algorithm": "ga",
+  "totalDistanceKm": 58.53,
+  "runTimeMs": 914,
+  "feasible": true,
+  "waypointCount": 13,
+  "createTime": "2026-10-30T17:08:02"
+}
+```
+
+详情响应：
+
+```json
+{
+  "resultId": 214,
+  "taskId": 2,
+  "algorithm": "ga",
+  "route": [254, 261, 256, "..."],
+  "totalDistanceKm": 58.53,
+  "runTimeMs": 914,
+  "feasible": true,
+  "detailPaths": [[31.3397, 121.4722], "..."],
+  "createTime": "2026-10-30T17:08:02"
+}
+```
+
+导出约定：
+- `kml`：UTF-8 KML 2.2，`LineString` 使用 `detailPaths`（缺失时回退航点顺序连线），并为每个巡检点生成 Placemark；文件名 `plan-{taskId}-{resultId}-{algorithm}.kml`
+- `csv`：UTF-8（带 BOM，Excel 直接打开不乱码），列为 `序号,类型,航点ID,名称,经度,纬度,高度(m),距上一点(km),累计航程(km)`
+- 响应头 `Content-Disposition: attachment; filename="..."`
+
+前端规划页新增「规划历史（N）」抽屉：按时间倒序列出历次结果，支持「查看」（重绘到地图）与 KML/CSV 导出。
+
+## 操作审计日志（2026-10-31，仅 admin）
+
+基于 `mission_log` 汇总任务执行留痕，供管理员跨任务查看。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/audit/logs` | 仅 admin | 分页查询执行留痕，按 id 倒序 |
+
+查询参数：`page`（默认 1）、`size`（默认 20，上限 100）、`taskId`、`action`（起飞/到点/返航/降落/异常）、`keyword`（对 `detail` 模糊匹配）。
+
+响应：
+
+```json
+{
+  "total": 32,
+  "page": 1,
+  "size": 5,
+  "records": [
+    {
+      "id": 45,
+      "taskId": 2,
+      "taskNo": "T1790776886600",
+      "taskName": "浏览器联调任务",
+      "droneId": 1,
+      "droneNo": "DJI-M300-01",
+      "action": "降落",
+      "waypointId": null,
+      "waypointName": null,
+      "logTime": "2026-10-30T17:29:54",
+      "detail": "无人机 DJI-M300-01 完成航线并降落，任务结束"
+    }
+  ]
+}
+```
+
+角色权限补充：`/api/audit` 与 `/api/users` 一致，**全部方法仅 admin**，普通用户访问返回 `403`。
+前端审计页 `/audit-logs`（仅 admin）：任务下拉 + 动作筛选 + 关键字搜索 + 服务端分页。
+

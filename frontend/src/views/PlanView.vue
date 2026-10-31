@@ -14,10 +14,10 @@
       </div>
       <div v-if="info" class="result-brief">
         <el-tag v-if="info.feasible" type="success" effect="dark" size="large">
-          {{ info.algorithm }} 规划完成 · 总航程 {{ info.totalDistanceKm }} km · 结果已入库 #{{ info.resultId }}
+          {{ info.algorithm }} {{ info.history ? '历史规划' : '规划完成' }} · 总航程 {{ info.totalDistanceKm }} km · 结果已入库 #{{ info.resultId }}
         </el-tag>
         <el-tag v-else type="danger" effect="dark" size="large">
-          {{ info.algorithm }} 规划不可行 · 总航程 {{ info.totalDistanceKm }} km 超过续航上限 {{ maxRange }} km
+          {{ info.algorithm }} {{ info.history ? '历史规划不可行' : '规划不可行' }} · 总航程 {{ info.totalDistanceKm }} km 超过续航上限 {{ maxRange }} km
         </el-tag>
       </div>
     </div>
@@ -63,6 +63,9 @@
               @click="run"
             >
               开始规划
+            </el-button>
+            <el-button style="width: 100%" @click="openHistory">
+              规划历史（{{ historyList.length }}）
             </el-button>
           </div>
           <div class="tip" style="margin-top: 6px">支持遗传、蚁群、贪心、最近邻、改进 A*（含禁飞区避障）共 5 种算法</div>
@@ -288,6 +291,56 @@
         <el-button type="primary" :loading="generating" :disabled="!genDialog.center" @click="confirmGenerate">生成</el-button>
       </template>
     </el-dialog>
+
+    <!-- 规划历史：历次 planning_result，可回看与导出 KML/CSV -->
+    <el-drawer v-model="historyVisible" title="规划历史" size="640px">
+      <div class="history-bar">
+        <span class="tip">共 {{ historyList.length }} 次规划，最新在上；「查看」会在地图重绘该次航线</span>
+        <el-button size="small" :loading="historyLoading" @click="loadHistory()">刷新</el-button>
+      </div>
+      <el-table
+        v-loading="historyLoading"
+        :data="historyList"
+        size="small"
+        border
+        max-height="520"
+        empty-text="暂无规划记录，先点击「开始规划」"
+      >
+        <el-table-column label="规划时间" width="150">
+          <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
+        </el-table-column>
+        <el-table-column label="算法" width="82">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain">{{ row.algorithm }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="总航程" width="96">
+          <template #default="{ row }">
+            <span :class="{ 'history-infeasible': !row.feasible }">
+              {{ row.totalDistanceKm == null ? '-' : row.totalDistanceKm }} km
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="可行性" width="82">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.feasible ? 'success' : 'danger'">
+              {{ row.feasible ? '可行' : '不可行' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="waypointCount" label="航点" width="62" />
+        <el-table-column label="操作" min-width="176">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="viewHistory(row)">查看</el-button>
+            <el-button link type="success" size="small" @click="downloadPlan(row, 'kml')">KML</el-button>
+            <el-button link type="warning" size="small" @click="downloadPlan(row, 'csv')">CSV</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="tip" style="margin-top: 8px">
+        KML 可直接导入 Google Earth / 高德地图查看航线；CSV 为按访问顺序的航点表（含分段与累计航程）
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -297,7 +350,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { fetchTask, fetchWaypoints, generateWaypoints, addWaypoint, deleteWaypoint, renameWaypoint as renameWaypointApi, updateTask, requestPlan, fetchNoFlyZones } from '../api/plan'
+import { fetchTask, fetchWaypoints, generateWaypoints, addWaypoint, deleteWaypoint, renameWaypoint as renameWaypointApi, updateTask, requestPlan, fetchNoFlyZones, fetchPlanHistory, fetchPlanDetail, exportPlan } from '../api/plan'
 
 const route = useRoute()
 const router = useRouter()
@@ -313,6 +366,10 @@ const locating = ref(false)
 const generating = ref(false)
 const addMode = ref(false)
 const info = ref(null)
+// 规划历史（历次 planning_result）
+const historyVisible = ref(false)
+const historyLoading = ref(false)
+const historyList = ref([])
 const picked = ref(null)
 const mapEl = ref(null)
 const task = ref(null)
@@ -838,18 +895,8 @@ async function run() {
       }
     })
     info.value = data
-    const posMap = new Map(waypoints.value.map(w => [w.id, [w.latitude, w.longitude]]))
-    const latlngs = data.route.map(id => posMap.get(id)).filter(Boolean)
-    // 避障折线：优先用后端透传的 detailPaths（含绕行弯折，元素 [lat,lng]），缺失则回退 route 直线
-    const detail = (data.detailPaths || []).map(p => [p[0], p[1]])
-    const lineCoords = detail.length >= 2 ? detail : latlngs
-    if (pathLayer) map.removeLayer(pathLayer)
-    if (lineCoords.length >= 2) {
-      pathLayer = L.polyline(lineCoords, { color: '#e11d48', weight: 3, opacity: 0.85, dashArray: '8 6' })
-        .bindPopup(`巡检路径：总航程 ${data.totalDistanceKm} km`).addTo(map)
-      drawOrderMarkers(data.route)
-      map.fitBounds(L.latLngBounds(lineCoords).pad(0.1))
-    }
+    drawPlanResult(data)
+    loadHistory(true)
     ElMessage.success(`规划完成：总航程 ${data.totalDistanceKm} km`)
     if (!data.feasible) {
       ElMessage.warning(`总航程 ${data.totalDistanceKm} km 超过续航上限 ${maxRange.value} km，结果不可行`)
@@ -860,6 +907,79 @@ async function run() {
   } finally {
     loading.value = false
   }
+}
+
+/** 在地图上绘制一次规划结果：优先避障折线 detailPaths，缺失则按 route 航点连线 */
+function drawPlanResult(data) {
+  if (!map || !data) return
+  const posMap = new Map(waypoints.value.map(w => [w.id, [w.latitude, w.longitude]]))
+  const latlngs = (data.route || []).map(id => posMap.get(id)).filter(Boolean)
+  const detail = (data.detailPaths || []).map(p => [p[0], p[1]])
+  const lineCoords = detail.length >= 2 ? detail : latlngs
+  if (pathLayer) map.removeLayer(pathLayer)
+  pathLayer = null
+  if (lineCoords.length >= 2) {
+    pathLayer = L.polyline(lineCoords, { color: '#e11d48', weight: 3, opacity: 0.85, dashArray: '8 6' })
+      .bindPopup(`巡检路径：总航程 ${data.totalDistanceKm} km`).addTo(map)
+    drawOrderMarkers(data.route || [])
+    map.fitBounds(L.latLngBounds(lineCoords).pad(0.1))
+  }
+}
+
+// ── 规划历史 / 导出 ─────────────────────────────────────────────
+async function loadHistory(silent = false) {
+  if (!taskId) return
+  historyLoading.value = true
+  try {
+    const { data } = await fetchPlanHistory(taskId)
+    historyList.value = data || []
+  } catch (e) {
+    if (!silent) ElMessage.error('规划历史加载失败：' + (e.response?.data?.message || e.message))
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function openHistory() {
+  historyVisible.value = true
+  loadHistory()
+}
+
+async function viewHistory(row) {
+  try {
+    const { data } = await fetchPlanDetail(taskId, row.resultId)
+    // 复用结果卡片：历史结果没有收敛曲线，标记 history 以便顶部提示区分
+    info.value = { ...data, convergence: null, history: true }
+    drawPlanResult(data)
+    historyVisible.value = false
+    ElMessage.success(`已回看第 #${row.resultId} 次规划（${row.algorithm}，${row.totalDistanceKm} km）`)
+  } catch (e) {
+    ElMessage.error('加载规划详情失败：' + (e.response?.data?.message || e.message))
+  }
+}
+
+async function downloadPlan(row, format) {
+  try {
+    const resp = await exportPlan(taskId, row.resultId, format)
+    const mime = format === 'kml' ? 'application/vnd.google-earth.kml+xml' : 'text/csv;charset=utf-8'
+    const blob = new Blob([resp.data], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const filename = `plan-${taskId}-${row.resultId}-${row.algorithm || 'plan'}.${format}`
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    ElMessage.success(`已导出 ${format.toUpperCase()}：${filename}`)
+  } catch (e) {
+    ElMessage.error('导出失败：' + (e.response?.data?.message || e.message))
+  }
+}
+
+function formatTime(t) {
+  return t ? String(t).replace('T', ' ').slice(0, 19) : '-'
 }
 
 onMounted(async () => {
@@ -873,6 +993,7 @@ onMounted(async () => {
   initMap()
   loadNoFlyZones()
   await drawWaypoints()
+  loadHistory(true)
 })
 
 onBeforeUnmount(() => {
@@ -1035,6 +1156,17 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #909399;
   line-height: 1.5;
+}
+.history-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.history-infeasible {
+  color: #dc2626;
+  font-weight: 600;
 }
 .coord-main {
   font-family: Consolas, monospace;

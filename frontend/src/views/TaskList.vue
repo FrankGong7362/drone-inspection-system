@@ -33,10 +33,10 @@
           <el-button
             v-if="isAdmin || row.createdBy === myId"
             size="small"
-            :type="row.status === '已完成' || row.status === '已取消' ? 'info' : 'success'"
-            :title="row.status === '已完成' || row.status === '已取消' ? '查看历史执行日志' : '下发执行 / 查看日志'"
+            type="success"
+            title="下发执行 / 再次执行"
             @click="goExecute(row)"
-          >{{ executeLabel(row) }}</el-button>
+          >{{ row.status === '执行中' ? '执行中' : '执行' }}</el-button>
           <el-button v-if="isAdmin || row.createdBy === myId" size="small" type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -176,12 +176,6 @@ function goPlan(row) {
 
 function goExecute(row) {
   router.push({ path: '/execute', query: { taskId: row.id } })
-}
-
-function executeLabel(row) {
-  if (row.status === '执行中') return '执行中'
-  if (row.status === '已完成' || row.status === '已取消') return '日志'
-  return '执行'
 }
 
 function statusType(s) {
