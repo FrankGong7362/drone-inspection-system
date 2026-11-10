@@ -1,0 +1,3 @@
+drone_no,model,max_flight_range_km,max_speed_kmh
+DR-001,示例型A,20.0,60.0
+DR-002,示例型B,15.0,55.0

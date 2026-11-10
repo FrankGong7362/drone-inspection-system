@@ -1,0 +1,16 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+body{margin:0;padding:26px 30px;background:#fff;font-family:"Microsoft YaHei","Segoe UI",sans-serif;color:#1f2937}
+h1{font-size:21px;margin:0 0 6px;font-weight:700}
+.meta{font-size:13px;color:#6b7280;margin-bottom:18px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f3f4f6;text-align:left;padding:9px 7px;border-top:1.2px solid #374151;border-bottom:1px solid #d1d5db;font-weight:600;white-space:nowrap}
+td{padding:8px 7px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+tr:last-child td{border-bottom:1.2px solid #374151}
+.mono{font-family:Consolas,monospace;font-size:13.5px;color:#374151;white-space:nowrap}
+.sum{color:#6b7280;font-size:13px;line-height:1.5}
+</style></head><body>
+<h1>接口异常与权限测试记录</h1>
+<div class="meta">测试时间：2026-11-06 13:55:41　　测试环境：Windows 11 / JDK 17 / Spring Boot 3.3.5 / FastAPI / MySQL 8.0　　测试工具：自动化脚本（HTTP 直连）</div>
+<table><thead><tr><th>编号</th><th>测试场景</th><th>请求</th><th>期望状态</th><th>实际状态</th><th>响应信息</th></tr></thead>
+<tbody><tr><td>E01</td><td>登录后正常请求（对照组）</td><td class='mono'>GET /api/tasks</td><td>200</td><td><span style="display:inline-block;min-width:52px;padding:2px 8px;border-radius:10px;color:#16a34a;background:#dcfce7;font-weight:600">200</span></td><td class='sum'>返回任务列表，共 7 条记录</td></tr><tr><td>E02</td><td>未携带令牌访问受保护接口</td><td class='mono'>GET /api/tasks</td><td>401</td><td><span style="display:inline-block;min-width:52px;padding:2px 8px;border-radius:10px;color:#d97706;background:#fef3c7;font-weight:600">401</span></td><td class='sum'>未登录或令牌缺失</td></tr><tr><td>E03</td><td>普通用户越权访问管理接口</td><td class='mono'>GET /api/users</td><td>403</td><td><span style="display:inline-block;min-width:52px;padding:2px 8px;border-radius:10px;color:#d97706;background:#fef3c7;font-weight:600">403</span></td><td class='sum'>需要管理员权限</td></tr><tr><td>E04</td><td>缺少必填参数发起规划</td><td class='mono'>POST /api/plan</td><td>400</td><td><span style="display:inline-block;min-width:52px;padding:2px 8px;border-radius:10px;color:#d97706;background:#fef3c7;font-weight:600">400</span></td><td class='sum'>缺少起点 start_point</td></tr><tr><td>E05</td><td>算法服务返回非法请求</td><td class='mono'>POST /api/plan</td><td>502</td><td><span style="display:inline-block;min-width:52px;padding:2px 8px;border-radius:10px;color:#dc2626;background:#fee2e2;font-weight:600">502</span></td><td class='sum'>算法服务返回 422：waypoint 缺少 id</td></tr><tr><td>E06</td><td>算法服务不可达</td><td class='mono'>POST /api/plan</td><td>503</td><td><span style="display:inline-block;min-width:52px;padding:2px 8px;border-radius:10px;color:#dc2626;background:#fee2e2;font-weight:600">503</span></td><td class='sum'>算法服务不可用，请确认 FastAPI 服务已启动(:8000)</td></tr></tbody></table>
+</body></html>

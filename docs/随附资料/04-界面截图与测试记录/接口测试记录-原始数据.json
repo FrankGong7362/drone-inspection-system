@@ -1,0 +1,56 @@
+[
+ {
+  "no": "E01",
+  "scene": "登录后正常请求（对照组）",
+  "req": "GET /api/tasks",
+  "expect": "200",
+  "code": 200,
+  "summary": "返回任务列表，共 7 条记录",
+  "time": "2026-11-06 13:55:41"
+ },
+ {
+  "no": "E02",
+  "scene": "未携带令牌访问受保护接口",
+  "req": "GET /api/tasks",
+  "expect": "401",
+  "code": 401,
+  "summary": "{\"timestamp\":\"2026-11-06T13:55:41.065+08:00\",\"status\":401,\"error\":\"Unauthorized\",\"message\":\"未登录或令牌缺失\",\"path\":\"/api/tasks\"}",
+  "time": "2026-11-06 13:55:41"
+ },
+ {
+  "no": "E03",
+  "scene": "普通用户越权访问管理接口",
+  "req": "GET /api/users",
+  "expect": "403",
+  "code": 403,
+  "summary": "{\"timestamp\":\"2026-11-06T13:55:41.067+08:00\",\"status\":403,\"error\":\"Forbidden\",\"message\":\"需要管理员权限\",\"path\":\"/api/users\"}",
+  "time": "2026-11-06 13:55:41"
+ },
+ {
+  "no": "E04",
+  "scene": "缺少必填参数发起规划",
+  "req": "POST /api/plan",
+  "expect": "400",
+  "code": 400,
+  "summary": "{\"timestamp\":\"2026-11-06T13:55:41.072+08:00\",\"status\":400,\"error\":\"Bad Request\",\"message\":\"缺少起点 start_point\",\"path\":\"/api/plan\"}",
+  "time": "2026-11-06 13:55:41"
+ },
+ {
+  "no": "E05",
+  "scene": "算法服务返回非法请求",
+  "req": "POST /api/plan",
+  "expect": "502",
+  "code": 502,
+  "summary": "算法服务返回 422：waypoint 缺少 id",
+  "time": "2026-11-06 13:55:41"
+ },
+ {
+  "no": "E06",
+  "scene": "算法服务不可达",
+  "req": "POST /api/plan",
+  "expect": "503",
+  "code": 503,
+  "summary": "{\"timestamp\":\"2026-11-06T13:55:25.319+08:00\",\"status\":503,\"error\":\"Service Unavailable\",\"message\":\"算法服务不可用，请确认 FastAPI 服务已启动(:8000)\",\"path\":\"/api/plan\"}",
+  "time": "2026-11-06 13:55:25"
+ }
+]
