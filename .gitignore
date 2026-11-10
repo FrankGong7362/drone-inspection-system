@@ -26,6 +26,7 @@ nohup.out
 # IDE
 .idea/
 .vscode/
+.trae/
 *.iml
 
 # OS
