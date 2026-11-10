@@ -6,11 +6,11 @@
       <span class="tip">仅管理员可见。修改角色后对方需重新登录才生效。</span>
     </div>
     <el-table :data="users" border stripe>
-      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="userId" label="ID" width="80" />
       <el-table-column prop="username" label="用户名" width="180">
         <template #default="{ row }">
           {{ row.username }}
-          <el-tag v-if="row.id === myId" size="small" type="info">我</el-tag>
+          <el-tag v-if="row.userId === myId" size="small" type="info">我</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="nickname" label="昵称" />
@@ -18,7 +18,7 @@
         <template #default="{ row }">
           <el-select
             :model-value="row.role"
-            :disabled="row.id === myId"
+            :disabled="row.userId === myId"
             size="small"
             @change="(role) => changeRole(row, role)"
           >
@@ -35,7 +35,7 @@
           <el-button
             size="small"
             type="danger"
-            :disabled="row.id === myId"
+            :disabled="row.userId === myId"
             @click="remove(row)"
           >删除</el-button>
         </template>
@@ -63,7 +63,7 @@ async function load() {
 async function changeRole(row, role) {
   if (role === row.role) return
   try {
-    await updateUserRole(row.id, role)
+    await updateUserRole(row.userId, role)
     row.role = role
     ElMessage.success('已修改角色，对方需重新登录后生效')
   } catch (e) {
@@ -78,7 +78,7 @@ async function remove(row) {
     return
   }
   try {
-    await deleteUser(row.id)
+    await deleteUser(row.userId)
     ElMessage.success('已删除')
     load()
   } catch (e) {

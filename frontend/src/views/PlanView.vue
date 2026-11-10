@@ -19,6 +19,15 @@
         <el-tag v-else type="danger" effect="dark" size="large">
           {{ info.algorithm }} {{ info.history ? '历史规划不可行' : '规划不可行' }} · 总航程 {{ info.totalDistanceKm }} km 超过续航上限 {{ maxRange }} km
         </el-tag>
+        <el-button
+          type="primary"
+          size="small"
+          style="margin-left: 8px"
+          :disabled="!info.feasible"
+          @click="goExecute"
+        >
+          去执行 →
+        </el-button>
       </div>
     </div>
 
@@ -193,6 +202,14 @@
               <polyline :points="convPoints" fill="none" stroke="#e6501a" stroke-width="1.5" />
             </svg>
           </div>
+          <el-button
+            type="success"
+            style="width: 100%; margin-top: 12px"
+            :disabled="!info.feasible"
+            @click="goExecute"
+          >
+            {{ info.feasible ? '下发执行' : '航程超限，不可执行' }}
+          </el-button>
         </div>
       </div>
 
@@ -924,6 +941,15 @@ function drawPlanResult(data) {
     drawOrderMarkers(data.route || [])
     map.fitBounds(L.latLngBounds(lineCoords).pad(0.1))
   }
+}
+
+// 规划完成后跳转到任务执行页面
+function goExecute() {
+  if (!info.value?.feasible) {
+    ElMessage.warning('当前规划超出续航上限，不可执行，请重新规划')
+    return
+  }
+  router.push({ path: '/execute', query: { taskId } })
 }
 
 // ── 规划历史 / 导出 ─────────────────────────────────────────────

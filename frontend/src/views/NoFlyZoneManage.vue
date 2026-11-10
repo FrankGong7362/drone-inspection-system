@@ -44,6 +44,9 @@
       v-model="dialog.visible"
       :title="dialog.id ? '编辑禁飞区' : '新增禁飞区'"
       width="440px"
+      draggable
+      :modal="!dialog.picking"
+      modal-penetrable
       @closed="endPick"
     >
       <el-form label-width="96px">
