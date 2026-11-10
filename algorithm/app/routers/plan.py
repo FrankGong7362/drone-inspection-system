@@ -36,7 +36,8 @@ def plan(request: PlanRequest):
     buffer_km = (request.constraints.no_fly_buffer_km
                  if request.constraints and request.constraints.no_fly_buffer_km is not None else 0.5)
     polyline, poly_total, poly_feasible, poly_msg = build_full_route_polyline(
-        request.start_point, list(request.waypoints), route, zones, buffer_km=buffer_km
+        request.start_point, list(request.waypoints), route, zones,
+        buffer_km=buffer_km, improved=(algo == "astar")
     )
     detail = polyline if polyline else None
     # 算法判不可行（如超续航/禁飞区阻隔）：保留其 message；

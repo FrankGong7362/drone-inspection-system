@@ -21,6 +21,7 @@ CELL_INIT = 0.001       # 默认栅格分辨率（°），约 0.111 km/格
 GRID_CAP = 400          # 默认行/列上限，超出则放大 cell
 CELL_FINE = 0.0005      # 折线重建用细分辨率（°），约 0.056 km/格
 GRID_CAP_FINE = 2400    # 细栅格行列上限
+ASTAR_WEIGHT = 1.5      # 改进 A* 的启发权重（加权 A*，牺牲少量最优性换取扩展节点数下降）
 
 
 def _haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -129,9 +130,86 @@ class AvoidGrid:
         return (int((lng - self.min_lng) / self.cell),
                 int((lat - self.min_lat) / self.cell))
 
-    def astar(self, src: Tuple[float, float], dst: Tuple[float, float]) -> Tuple[Optional[float], Optional[List[Tuple[int, int]]]]:
+    def _line_cells(self, a: Tuple[int, int], b: Tuple[int, int]) -> List[Tuple[int, int]]:
+        """Bresenham 栅格直线：返回格点 a→b 经过的格子序列（含首尾）。"""
+        c0, r0 = a
+        c1, r1 = b
+        dc, dr = abs(c1 - c0), abs(r1 - r0)
+        sc = 1 if c0 < c1 else -1
+        sr = 1 if r0 < r1 else -1
+        err = dc - dr
+        cells = []
+        c, r = c0, r0
+        while True:
+            cells.append((c, r))
+            if (c, r) == (c1, r1):
+                break
+            e2 = 2 * err
+            if e2 > -dr:
+                err -= dr
+                c += sc
+            if e2 < dc:
+                err += dc
+                r += sr
+        return cells
+
+    def _los_clear(self, a: Tuple[int, int], b: Tuple[int, int]) -> bool:
+        """视线可达判定：栅格直线不经过障碍格，且对角步不切障碍角点。
+
+        用于改进 A* 的路径平滑：只保留必要的拐点，去除栅格锯齿。
+        """
+        cells = self._line_cells(a, b)
+        for (c, r) in cells[1:-1]:
+            if (c, r) in self.blocked:
+                return False
+        for (c0, r0), (c1, r1) in zip(cells, cells[1:]):
+            if c1 != c0 and r1 != r0:
+                if (c1, r0) in self.blocked or (c0, r1) in self.blocked:
+                    return False
+        return True
+
+    def _smooth_path(self, path: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+        """视线平滑（string pulling）：从当前点尽量连到最远的可见节点。
+
+        只平滑自由格区间，端点逃逸段（可能位于膨胀环内）原样保留，
+        避免破坏"端点安全距离外"的绕行约束。
+        """
+        if len(path) < 3:
+            return path
+        free_idx = [i for i, p in enumerate(path) if p not in self.blocked]
+        if len(free_idx) < 3:
+            return path
+        i0, i1 = free_idx[0], free_idx[-1]
+        middle = path[i0:i1 + 1]
+        out = [middle[0]]
+        j = 0
+        while j < len(middle) - 1:
+            k = len(middle) - 1
+            while k > j + 1 and not self._los_clear(middle[j], middle[k]):
+                k -= 1
+            out.append(middle[k])
+            j = k
+        return path[:i0] + out + path[i1 + 1:]
+
+    def _path_length_km(self, path: List[Tuple[int, int]]) -> float:
+        """格点路径的球面长度（km），用于平滑后重算真实航程。"""
+        total = 0.0
+        for (c0, r0), (c1, r1) in zip(path, path[1:]):
+            total += _haversine(self.min_lat + r0 * self.cell, self.min_lng + c0 * self.cell,
+                                self.min_lat + r1 * self.cell, self.min_lng + c1 * self.cell)
+        return total
+
+    def astar(self, src: Tuple[float, float], dst: Tuple[float, float],
+              weight: float = 1.0, smooth: bool = False,
+              stats: Optional[dict] = None) -> Tuple[Optional[float], Optional[List[Tuple[int, int]]]]:
         """单段 A*：src/dst 为 (lng, lat)。返回 (避障距离km, 格子路径)。
-        起点或终点落在真实圆内、或不可达 → 返回 (None, None)。"""
+
+        weight>1 为加权 A*（改进点 1：启发权重 w=1.5，减少扩展节点）；
+        smooth=True 时对自由段做视线平滑（改进点 2：去除栅格锯齿、减少转折与航程）；
+        对角移动禁止穿过障碍角点（改进点 3：防角点穿越）。
+        stats 可选，回填 {"expanded": 有效扩展节点数}，供论文对比实验。
+        起点或终点落在真实圆内、或不可达 → 返回 (None, None)。
+        """
         sg = self.to_grid(src[0], src[1])
         dg = self.to_grid(dst[0], dst[1])
         if sg == dg:
@@ -209,9 +287,9 @@ class AvoidGrid:
         dst_esc = dict(dst_exits)
 
         def rem(c, r):
-            """到目标的剩余代价估计：dst 侧出口用逃逸距离（更紧且一致），其余用直线。"""
+            """到目标的剩余代价估计：dst 侧出口用逃逸距离（更紧且一致），其余用加权直线。"""
             d = dst_esc.get((c, r))
-            return d if d is not None else h(c, r)
+            return d if d is not None else weight * h(c, r)
 
         # 多源（src 出口，带逃逸代价）→ 多目标（到达任一 dst 出口即达）。
         # 堆里只存 (f, g, 格)，路径用 came_from 回溯——堆内拷贝整条 path
@@ -224,6 +302,10 @@ class AvoidGrid:
             heapq.heappush(open_heap, (d_e + rem(e[0], e[1]), d_e, e))
         while open_heap:
             _, g, cur = heapq.heappop(open_heap)
+            if g > g_best.get(cur, math.inf):
+                continue
+            if stats is not None:
+                stats["expanded"] = stats.get("expanded", 0) + 1
             if cur in dst_esc:
                 total = g + dst_esc[cur]
                 seg = [cur]
@@ -239,7 +321,11 @@ class AvoidGrid:
                 while dst_came.get(x) is not None:
                     x = dst_came[x]
                     tail.append(x)                  # cur 环内回溯 → dg
-                return total, head + seg[1:] + tail
+                path = head + seg[1:] + tail
+                if smooth:
+                    path = self._smooth_path(path)
+                    total = self._path_length_km(path)
+                return total, path
             if g > g_best.get(cur, math.inf):
                 continue
             c, r = cur
@@ -251,6 +337,9 @@ class AvoidGrid:
                 if nxt in self.blocked:
                     # 自由格一律禁入膨胀环；端点环内通道由 esc_bfs 专门负责
                     continue
+                # 防角点穿越：对角步要求两个正交邻格均可行，避免斜穿障碍角
+                if dc and dr and ((c + dc, r) in self.blocked or (c, r + dr) in self.blocked):
+                    continue
                 ng = g + w
                 if ng < g_best.get(nxt, math.inf):
                     g_best[nxt] = ng
@@ -260,12 +349,14 @@ class AvoidGrid:
 
 
 def obstacle_distance_matrix(start, waypoints: List, zones: List,
-                             buffer_km: float = 0.0) -> Optional[List[List[float]]]:
+                             buffer_km: float = 0.0,
+                             improved: bool = False) -> Optional[List[List[float]]]:
     """构建 (n+1)x(n+1) 对称避障距离矩阵（节点0=起点，1..n=航点）。
 
     zones 为空 → 返回直线 haversine 矩阵（与原 ga 逻辑一致）。
     zones 非空 → 一次构建 AvoidGrid（圆膨胀 buffer_km），逐对点调 astar；
       若任一对不可达 → 返回 None（禁飞区阻隔）。
+    improved=True 时使用改进 A*（加权启发 + 视线平滑）计算段间避障距离。
     """
     nodes = [start] + list(waypoints)
     n = len(nodes)
@@ -286,7 +377,9 @@ def obstacle_distance_matrix(start, waypoints: List, zones: List,
     dm = [[0.0] * n for _ in range(n)]
     for i in range(n):
         for j in range(i + 1, n):
-            dist, _ = grid.astar(points[i], points[j])
+            dist, _ = grid.astar(points[i], points[j],
+                                 weight=ASTAR_WEIGHT if improved else 1.0,
+                                 smooth=improved)
             if dist is None:
                 return None  # 禁飞区阻隔
             dm[i][j] = dm[j][i] = dist
@@ -322,11 +415,13 @@ def segment_crosses_zone(p: Tuple[float, float], q: Tuple[float, float], zones: 
 
 
 def build_full_route_polyline(start, waypoints: List, route_ids: List[int], zones: List,
-                              buffer_km: float = 0.0) -> Tuple[List[List[float]], float, bool, str]:
+                              buffer_km: float = 0.0,
+                              improved: bool = False) -> Tuple[List[List[float]], float, bool, str]:
     """统一避障折线构建（供 plan.py 调用，前端画线用）。
 
     仅"直线穿过 圆+buffer"的段用 A* 绕行折线（细栅格 CELL_FINE，紧贴膨胀圆），
     其余段保持直线（消除不必要锯齿）。
+    improved=True 时绕行段使用改进 A*（加权启发 + 视线平滑）。
 
     返回：
       full_polyline: [[lat, lng], ...] Leaflet 顺序的完整航线（含所有弯折）
@@ -382,7 +477,9 @@ def build_full_route_polyline(start, waypoints: List, route_ids: List[int], zone
         if grid is None:
             grid = AvoidGrid(zones, all_points, buffer_km=buffer_km,
                              cell_init=CELL_FINE, grid_cap=GRID_CAP_FINE)
-        seg_len, seg_path = grid.astar((a.lng, a.lat), (b.lng, b.lat))
+        seg_len, seg_path = grid.astar((a.lng, a.lat), (b.lng, b.lat),
+                                       weight=ASTAR_WEIGHT if improved else 1.0,
+                                       smooth=improved)
         if seg_len is None:
             return [], 0.0, False, "禁飞区完全阻隔航线，无可达路径"
         # 首/尾格角用精确航点坐标替换（航线直接落在航点上），中间格点保留
