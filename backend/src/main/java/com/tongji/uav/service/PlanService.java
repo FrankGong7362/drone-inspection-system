@@ -9,7 +9,7 @@ import com.tongji.uav.entity.PlanningResult;
 import com.tongji.uav.entity.Task;
 import com.tongji.uav.mapper.PlanningResultMapper;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -27,16 +27,22 @@ public class PlanService {
     private final PlanClient planClient;
     private final PlanningResultMapper planningResultMapper;
     private final TaskService taskService;
+    private final TransactionTemplate transactionTemplate;
 
     public PlanService(PlanClient planClient,
                        PlanningResultMapper planningResultMapper,
-                       TaskService taskService) {
+                       TaskService taskService,
+                       TransactionTemplate transactionTemplate) {
         this.planClient = planClient;
         this.planningResultMapper = planningResultMapper;
         this.taskService = taskService;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
+    /**
+     * 路径规划：先在事务外完成参数校验与算法服务调用（远程计算耗时从毫秒到数十秒不等，
+     * 不能占用数据库连接），再以编程式事务仅包裹"结果入库 + 任务航程回填"两次写操作。
+     */
     public PlanResultVO plan(PlanCommand command) {
         // 1. 参数校验
         if (command.getTaskId() == null) {
@@ -67,38 +73,40 @@ public class PlanService {
             throw new IllegalStateException("路径规划失败: " + msg);
         }
 
-        // 3. 结果落库 planning_result
-        PlanningResult result = new PlanningResult();
-        result.setTaskId(command.getTaskId());
-        result.setAlgorithm(resp.getAlgorithm());
-        result.setRoute(resp.getRoute());
-        result.setDetailPaths(resp.getDetailPaths());
-        result.setTotalDistance(resp.getTotalDistanceKm() == null
-                ? null : BigDecimal.valueOf(resp.getTotalDistanceKm()).setScale(2, RoundingMode.HALF_UP));
-        result.setRunTimeMs(resp.getRunTimeMs());
-        result.setFeasible(resp.getFeasible());
-        planningResultMapper.insert(result);
+        // 3. 仅将"结果入库 + 任务航程回填"放入事务，远程调用不占用数据库连接
+        return transactionTemplate.execute(status -> {
+            PlanningResult result = new PlanningResult();
+            result.setTaskId(command.getTaskId());
+            result.setAlgorithm(resp.getAlgorithm());
+            result.setRoute(resp.getRoute());
+            result.setDetailPaths(resp.getDetailPaths());
+            result.setTotalDistance(resp.getTotalDistanceKm() == null
+                    ? null : BigDecimal.valueOf(resp.getTotalDistanceKm()).setScale(2, RoundingMode.HALF_UP));
+            result.setRunTimeMs(resp.getRunTimeMs());
+            result.setFeasible(resp.getFeasible());
+            planningResultMapper.insert(result);
 
-        // 4. 回填任务总航程
-        Task task = taskService.getById(command.getTaskId());
-        if (task == null) {
-            throw new IllegalArgumentException("任务不存在: " + command.getTaskId());
-        }
-        task.setTotalDistance(result.getTotalDistance());
-        taskService.updateById(task);
+            // 4. 回填任务总航程
+            Task task = taskService.getById(command.getTaskId());
+            if (task == null) {
+                throw new IllegalArgumentException("任务不存在: " + command.getTaskId());
+            }
+            task.setTotalDistance(result.getTotalDistance());
+            taskService.updateById(task);
 
-        // 5. 返回视图
-        PlanResultVO vo = new PlanResultVO();
-        vo.setResultId(result.getId());
-        vo.setTaskId(command.getTaskId());
-        vo.setAlgorithm(resp.getAlgorithm());
-        vo.setRoute(resp.getRoute());
-        vo.setTotalDistanceKm(resp.getTotalDistanceKm());
-        vo.setFeasible(resp.getFeasible());
-        vo.setRunTimeMs(resp.getRunTimeMs());
-        vo.setMessage(resp.getMessage());
-        vo.setConvergence(resp.getConvergence());
-        vo.setDetailPaths(resp.getDetailPaths());
-        return vo;
+            // 5. 返回视图
+            PlanResultVO vo = new PlanResultVO();
+            vo.setResultId(result.getId());
+            vo.setTaskId(command.getTaskId());
+            vo.setAlgorithm(resp.getAlgorithm());
+            vo.setRoute(resp.getRoute());
+            vo.setTotalDistanceKm(resp.getTotalDistanceKm());
+            vo.setFeasible(resp.getFeasible());
+            vo.setRunTimeMs(resp.getRunTimeMs());
+            vo.setMessage(resp.getMessage());
+            vo.setConvergence(resp.getConvergence());
+            vo.setDetailPaths(resp.getDetailPaths());
+            return vo;
+        });
     }
 }

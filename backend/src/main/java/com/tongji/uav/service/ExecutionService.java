@@ -1,6 +1,7 @@
 package com.tongji.uav.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tongji.uav.dto.LatestPlanVO;
 import com.tongji.uav.dto.MissionLogRequest;
 import com.tongji.uav.entity.Drone;
@@ -75,16 +76,22 @@ public class ExecutionService {
         if (drone == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "无人机不存在");
         }
-        if (!"可用".equals(drone.getStatus())) {
-            throw new IllegalArgumentException("无人机当前不可用（状态：" + drone.getStatus() + "）");
-        }
 
         task.setStatus("执行中");
         taskService.updateById(task);
 
+        // 条件原子更新：仅当无人机状态仍为"可用"时才占用，避免并发下同一架无人机被重复占用
+        int rows = droneMapper.update(null, new LambdaUpdateWrapper<Drone>()
+                .eq(Drone::getId, droneId)
+                .eq(Drone::getStatus, "可用")
+                .set(Drone::getStatus, "作业")
+                .set(Drone::getBindTaskId, task.getId()));
+        if (rows == 0) {
+            throw new IllegalArgumentException("无人机当前不可用或已被其他任务占用");
+        }
+        // 同步内存对象状态，供后续日志写入使用
         drone.setStatus("作业");
         drone.setBindTaskId(task.getId());
-        droneMapper.updateById(drone);
 
         MissionLog log = new MissionLog();
         log.setTaskId(task.getId());
